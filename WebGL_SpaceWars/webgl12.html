@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Привет WebGL!</title>
+    <meta charset="utf-8">
+    <link href="styles.css" rel="stylesheet">
+</head>
+
+<body>
+    <!--<img src="http://localhost:8888/WebGL/Galaxy.jpg" id="lamp" width="600" height="32">-->
+    <audio src="http://localhost:8888/WebGL/SpaceShipOne%20%E2%80%93%20Hero.mp3" preload="auto" autoplay="autoplay"></audio>
+    <div class="container">
+
+        <div>Space Wars</div>
+
+        <div>Количество жизней:
+            <span id="Lifes"> 5 </span>
+        </div>
+
+        <div id="Field">
+            <canvas id="canvas" width="500" height="500">Ваш браузер не поддерживает элемент canvas</canvas>
+            <div id="Gameover"> Game Over </div>
+            <form id="Start">
+                <input name="StartButton" type="button" value="Старт" onClick="StartTexture();">
+            </form>
+            <form id="Restart">
+                <input name="RestartButton" type="button" value="Начать заново" onClick="Restart();">
+            </form>
+        </div>
+
+    </div>
+    <!-- фрагментный шейдер -->
+    <!-- вершинный шейдер -->
+    <script id="shader-vs">
+        // an attribute will receive data from a buffer
+        attribute vec2 a_position;
+
+        uniform vec2 u_translation;
+
+        //attribute vec4 a_color;
+        //varying vec4 v_color;
+
+        attribute vec2 a_texCoord;
+        varying vec2 v_texCoord;
+
+        void main(void) {
+            // Add in the translation.
+            vec2 position = a_position + u_translation;
+
+            //v_color = a_color;
+            v_texCoord = a_texCoord;
+
+            gl_Position = vec4(position, 0, 1);
+        }
+    </script>
+    <script id="shader-fs">
+        precision mediump float;
+
+        uniform sampler2D u_image;
+        //uniform sampler2D u_image1;
+
+
+        varying vec4 v_color;
+        varying vec2 v_texCoord;
+
+        void main(void) {
+            /*gl_FragColor = vec4(
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0
+                );*/
+            gl_FragColor = texture2D(u_image, v_texCoord);
+        }
+    </script>
+
+    <script type="text/javascript">
+        var canvas = document.getElementById("canvas");
+        var gl = canvas.getContext("webgl");
+        //gl.clearColor(1.0, 0.0, 0.0, 0.5);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+
+        if (!gl) {
+            alert("Ваш браузер не поддерживает WebGL");
+        }
+        gl.viewportWidth = canvas.width;
+        gl.viewportHeight = canvas.height;
+
+        //gl.viewport(0, 0, gl.canvas.width, gl.canvas.height); - почему-то не работает
+
+        var shaderProgram;
+        var vertexBuffer;
+
+        var translationShip = [0, 0.0];
+        var translationMeteo = [0, 0.0];
+        var translation = [0, 0];
+        var translationBullet = [0, 0];
+
+
+        // установка шейдеров
+        function initShaders() {
+            // получаем шейдеры
+            var fragmentShader = getShader(gl.FRAGMENT_SHADER, 'shader-fs');
+            var vertexShader = getShader(gl.VERTEX_SHADER, 'shader-vs');
+            //создаем объект программы шейдеров
+            shaderProgram = gl.createProgram();
+            // прикрепляем к ней шейдеры
+            gl.attachShader(shaderProgram, vertexShader);
+            gl.attachShader(shaderProgram, fragmentShader);
+            // связываем программу с контекстом webgl
+            gl.linkProgram(shaderProgram);
+
+            if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+                alert("Не удалсь установить шейдеры");
+            }
+
+            gl.useProgram(shaderProgram);
+            // установка атрибута программы
+            shaderProgram.vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "a_position");
+            shaderProgram.translationLocation = gl.getUniformLocation(shaderProgram, "u_translation");
+            //shaderProgram.colorLocation = gl.getAttribLocation(shaderProgram, "a_color");
+
+
+            // делаем доступным атрибут для использования
+
+            gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
+            //gl.enableVertexAttribArray(shaderProgram.colorLocation);
+
+
+
+        }
+        // Функция создания шейдера по типу и id источника в структуре DOM
+        function getShader(type, id) {
+            var source = document.getElementById(id).innerHTML;
+            // создаем шейдер по типу
+            var shader = gl.createShader(type);
+            // установка источника шейдера
+            gl.shaderSource(shader, source);
+            // компилируем шейдер
+            gl.compileShader(shader);
+
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                alert("Ошибка компиляции шейдера: " + gl.getShaderInfoLog(shader));
+                gl.deleteShader(shader);
+                return null;
+            }
+            return shader;
+        }
+        // установка буфера вершин 
+        function initBuffers() {
+            var color = [];
+
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            //gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image[2]);
+            gl.bindTexture(gl.TEXTURE_2D, texture[2]);
+            //bullets
+            BulletCoors.forEach(function(item, i, BulletCoors) {
+                translationBullet = [0, 0];
+                gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+                var bullet = [
+                    ShipCentre[0], item.coordCentre[1] + 0.01,
+                    ShipCentre[0] + 0.03, item.coordCentre[1] + 0.01,
+                    ShipCentre[0], item.coordCentre[1] - 0.01,
+                    ShipCentre[0] + 0.03, item.coordCentre[1] - 0.01,
+                ];
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(bullet), gl.DYNAMIC_DRAW);
+                translationBullet[0] = item.transDist;
+                gl.uniform2fv(shaderProgram.translationLocation, translationBullet);
+                gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 2, gl.FLOAT, false, 0, 0);
+
+                /*gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(
+                    [1, 0, 0, 1,
+                        1, 0, 0, 1,
+                        1, 0, 0, 1,
+                        1, 0, 0, 1,
+                    ]), gl.STATIC_DRAW);
+                gl.vertexAttribPointer(shaderProgram.colorLocation, 4, gl.FLOAT, false, 0, 0);*/
+
+                gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 1, 1, 1, 0, 0, 1, 0]), gl.STATIC_DRAW);
+                //gl.uniform2fv(shaderProgram.translationLocation, translationShip);
+                var size = 2; // 2 components per iteration
+                var type = gl.FLOAT; // the data is 32bit floats
+                var normalize = false; // don't normalize the data
+                var stride = 0; // 0 = move forward size * sizeof(type) each iteration to get the next position
+                var offset = 0; // start at the beginning of the buffer
+                gl.vertexAttribPointer(
+                    shaderProgram.texCoordLocation, size, type, normalize, stride, offset);
+
+                gl.drawArrays(gl.LINE_LOOP, 0, 4);
+
+                item.coordCentre[0] = ShipCentre[0] + translationBullet[0];
+            })
+
+
+            //gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image[0]);
+
+            //starship
+            if (boom == true) gl.bindTexture(gl.TEXTURE_2D, texture[4]);
+            else gl.bindTexture(gl.TEXTURE_2D, texture[0]);
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+            // массив координат вершин объекта
+            var starship = [-0.9, 0.1, -0.9, -0.1, -0.7, 0.0];
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(starship), gl.STATIC_DRAW);
+            // указываем кол-во точек
+            gl.uniform2fv(shaderProgram.translationLocation, translationShip);
+            var itemSize = 2; // 2 components per iteration
+            var type = gl.FLOAT; // the data is 32bit floats
+            var normalize = false; // don't normalize the data
+            var stride = 0; // 0 = move forward size * sizeof(type) each iteration to get the next position
+            var offset = 0; // start at the beginning of the buffer
+            var count = 3;
+            // указываем, что каждая вершина имеет по две координаты (x, y)
+            gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute,
+                itemSize, type, normalize, stride, offset);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 0, 1, 1, 0.5]), gl.STATIC_DRAW);
+            //gl.uniform2fv(shaderProgram.translationLocation, translationShip);
+            var size = 2; // 2 components per iteration
+            var type = gl.FLOAT; // the data is 32bit floats
+            var normalize = false; // don't normalize the data
+            var stride = 0; // 0 = move forward size * sizeof(type) each iteration to get the next position
+            var offset = 0; // start at the beginning of the buffer
+            gl.vertexAttribPointer(
+                shaderProgram.texCoordLocation, size, type, normalize, stride, offset);
+
+            gl.drawArrays(gl.TRIANGLES, offset, 3);
+
+            /*gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer)
+                if (boom == true) {
+                    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(
+                        [1, 0, 0, 1,
+                            1, 0, 0, 1,
+                            1, 0, 0, 1,
+                        ]
+                    ), gl.STATIC_DRAW);
+                } else {
+                    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(
+                        [1, 1, 1, 1,
+                            1, 1, 1, 1,
+                            1, 1, 1, 1
+                        ]
+                    ), gl.STATIC_DRAW);
+                }
+                gl.vertexAttribPointer(shaderProgram.colorLocation, 4, gl.FLOAT, false, 0, 0);
+
+            /*CircleShip = [];
+            DrawCircle(-0.8, 0, 0.1, CircleShip, color);
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(CircleShip), gl.DYNAMIC_DRAW);
+            gl.uniform2fv(shaderProgram.translationLocation, translationShip);
+            gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 2, gl.FLOAT, false, 0, 0);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(color), gl.STATIC_DRAW);
+            gl.vertexAttribPointer(shaderProgram.colorLocation, 4, gl.FLOAT, false, 0, 0);
+
+            gl.drawArrays(gl.LINE_LOOP, 0, 36);*/
+
+            ShipCentre[1] = 0 + translationShip[1];
+
+            //gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image[1]);
+
+
+
+            //meteos
+            MeteoCoors.forEach(function(item, i, MeteoCoors) {
+
+                gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+                //var meteos = [0.8, item.y, 1.0, item.y, 1.0, item.y - 0.2, 0.8, item.y - 0.2];
+                var meteos = [];
+                meteos = DrawCircle(0.9, item.y, 0.1, meteos, color);
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(meteos), gl.DYNAMIC_DRAW);
+                gl.uniform2fv(shaderProgram.translationLocation, item.trans);
+                gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 2, gl.FLOAT, false, 0, 0);
+
+                if (item.boom == false) {
+                    gl.bindTexture(gl.TEXTURE_2D, texture[1]);
+                    gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+                    meteostexture = [];
+                    meteostexture = DrawCircle(0.5, 0.5, 0.5, meteostexture, color);
+                    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(meteostexture), gl.STATIC_DRAW);
+                    //gl.uniform2fv(shaderProgram.translationLocation, translationShip);
+                    var size = 2; // 2 components per iteration
+                    var type = gl.FLOAT; // the data is 32bit floats
+                    var normalize = false; // don't normalize the data
+                    var stride = 0; // 0 = move forward size * sizeof(type) each iteration to get the next position
+                    var offset = 0; // start at the beginning of the buffer
+                    gl.vertexAttribPointer(
+                        shaderProgram.texCoordLocation, size, type, normalize, stride, offset);
+                } else {
+                    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+                    //var meteos = [0.8, item.y, 1.0, item.y, 1.0, item.y - 0.2, 0.8, item.y - 0.2];
+                    var meteos = [];
+                    meteos = DrawCircle(0.9, item.y, 0.2, meteos, color);
+                    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(meteos), gl.DYNAMIC_DRAW);
+                    gl.uniform2fv(shaderProgram.translationLocation, item.trans);
+                    gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 2, gl.FLOAT, false, 0, 0);
+
+                    gl.bindTexture(gl.TEXTURE_2D, texture[3]);
+
+                    gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+                    meteostexture = [];
+                    meteostexture = DrawCircle(0.5, 0.5, 0.5, meteostexture, color);
+                    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(meteostexture), gl.STATIC_DRAW);
+                    //gl.uniform2fv(shaderProgram.translationLocation, translationShip);
+                    var size = 2; // 2 components per iteration
+                    var type = gl.FLOAT; // the data is 32bit floats
+                    var normalize = false; // don't normalize the data
+                    var stride = 0; // 0 = move forward size * sizeof(type) each iteration to get the next position
+                    var offset = 0; // start at the beginning of the buffer
+                    gl.vertexAttribPointer(
+                        shaderProgram.texCoordLocation, size, type, normalize, stride, offset);
+                }
+                /*gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(color), gl.STATIC_DRAW);
+                gl.vertexAttribPointer(shaderProgram.colorLocation, 4, gl.FLOAT, false, 0, 0);
+                gl.drawArrays(gl.LINE_LOOP, 0, 36);*/
+
+                /*var CircleOneMeteo = [];
+                CircleOneMeteo = DrawCircle(0.9, item.y - 0.1, 0.1, CircleOneMeteo, color);
+                gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(CircleOneMeteo), gl.DYNAMIC_DRAW);
+                gl.uniform2fv(shaderProgram.translationLocation, item.trans);
+                gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 2, gl.FLOAT, false, 0, 0);
+
+                gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(color), gl.STATIC_DRAW);
+                gl.vertexAttribPointer(shaderProgram.colorLocation, 4, gl.FLOAT, false, 0, 0);*/
+
+                gl.drawArrays(gl.TRIANGLE_FAN, 0, 38);
+
+                item.centre[0] = 0.9 + item.trans[0];
+            })
+
+
+            /*var centre = [];
+            centre = DrawCircle(0, 0, 0.1, centre, color);
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(centre), gl.DYNAMIC_DRAW);
+            gl.uniform2fv(shaderProgram.translationLocation, translation);
+            gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 2, gl.FLOAT, false, 0, 0);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 1, 1]), gl.STATIC_DRAW);
+            gl.vertexAttribPointer(shaderProgram.colorLocation, 4, gl.FLOAT, false, 0, 0);
+
+            gl.drawArrays(gl.LINE_LOOP, 0, 36);*/
+
+
+            function DrawCircle(centreX, centreY, Radius, circleArray, color) {
+                //var circleArray = [];
+                circleArray.push(centreX);
+                circleArray.push(centreY);
+                for (var i = 0; i <= 360; i += 10) {
+                    //var a = 2 * 3.14 / 360 * i - ; //n - число вершин, i - угол
+                    circleArray.push(centreX + Math.round(Math.cos(i * 3.14 / 180) * 100) / 100 * Radius);
+                    circleArray.push(centreY + Math.round(Math.sin(i * 3.14 / 180) * 100) / 100 * Radius);
+                    color.push(1, 1, 1, 1);
+
+                }
+                return circleArray;
+            }
+            /*if (boomMeteo = true) {
+                //boom
+                gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+                var meteos = [];
+                //meteos = DrawCircle(0.9, item.y, 0.1, meteos, color);
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([x - 0.15, y - 0.15, x - 0.15, y + 0.15, x + 0.15, y - 0.15, x + 0.15, y + 0.15]), gl.DYNAMIC_DRAW);
+                gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 2, gl.FLOAT, false, 0, 0);
+
+                gl.bindTexture(gl.TEXTURE_2D, texture[3]);
+                gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 0, 1, 1, 0, 1, 1]), gl.STATIC_DRAW);
+                var size = 2; // 2 components per iteration
+                var type = gl.FLOAT; // the data is 32bit floats
+                var normalize = false; // don't normalize the data
+                var stride = 0; // 0 = move forward size * sizeof(type) each iteration to get the next position
+                var offset = 0; // start at the beginning of the buffer
+                gl.vertexAttribPointer(
+                    shaderProgram.texCoordLocation, size, type, normalize, stride, offset);
+                gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        }*/
+
+
+        }
+        // отрисовка 
+
+
+        function Meteo() {
+            this.y;
+            this.trans;
+            this.transDist;
+            this.centre = [];
+            this.life;
+            this.boom = false;
+        }
+
+        function Bullet() {
+            this.transDist;
+            this.coordCentre = [];
+        }
+
+        var MeteoCoors = [];
+        var BulletCoors = [];
+
+        var ShipCentre = [-0.9, 0.0];
+
+        var boom = false;
+        var boomMeteo = false;
+
+        var pifpaf = false;
+
+        var HP = 5;
+
+        var end = false;
+
+        function StartTexture() {
+
+            //document.getElementById("Start").style.visibility = "hidden";
+            // установка шейдеров 
+            //initShaders();
+
+            //vertexBuffer = gl.createBuffer();
+
+            //colorBuffer = gl.createBuffer();
+            document.getElementById("Start").style.visibility = "hidden";
+            // установка шейдеров 
+            initShaders();
+            vertexBuffer = gl.createBuffer();
+
+            texCoordBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+
+            image = [];
+
+            image[0] = new Image();
+            image[0].src = "http://localhost:8888/WebGL/raumschiff.png"; // ДОЛЖНА НАХОДИТЬСЯ НА ТОМ ЖЕ ДОМЕНЕ!!!
+            image[0].onload = function() {
+                image[1] = new Image();
+                image[1].src = "http://localhost:8888/WebGL/meteo.png";
+                image[1].onload = function() {
+                    image[2] = new Image();
+                    image[2].src = "http://localhost:8888/WebGL/blue.jpg";
+                    image[2].onload = function() {
+                        image[3] = new Image();
+                        image[3].src = "http://localhost:8888/WebGL/Boom.png";
+                        image[3].onload = function() {
+                            image[4] = new Image();
+                            image[4].src = "http://localhost:8888/WebGL/raumschiffrot.png";
+                            image[4].onload = function() {
+                                render();
+                                Start();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        function render() {
+            shaderProgram.texCoordLocation = gl.getAttribLocation(shaderProgram, "a_texCoord");
+            gl.enableVertexAttribArray(shaderProgram.texCoordLocation);
+
+            //texCoordBuffer = gl.createBuffer();
+            //gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+            textures = [];
+            texture = [];
+            image.forEach(function(item, i, image) {
+                texture[i] = gl.createTexture();
+
+                //texture2 = gl.createTexture();
+                gl.bindTexture(gl.TEXTURE_2D, texture[i]);
+
+
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
+                //image.forEach(function() {
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image[i]);
+                //})
+            })
+            u_image0Location = gl.getUniformLocation(shaderProgram, "u_image");
+            //u_iname1Location = gl.getUniformLocation(shaderProgram, "u_image1");
+            gl.uniform1i(u_image0Location, 0);
+            //gl.uniform1i(u_image1Location, 1);
+            gl.activeTexture(gl.TEXTURE0);
+            //gl.bindTexture(gl.TEXTURE_2D, texture);
+            //gl.activeTexture(gl.TEXTURE1);
+            //gl.bindTexture(gl.TEXTURE_2D, texture2);
+        }
+
+        function Start() {
+
+            document.getElementById("Restart").style.visibility = "hidden";
+            var MeteoCount = 0;
+
+            /* document.getElementById("Start").style.visibility = "hidden";
+             // установка шейдеров 
+             initShaders();
+             vertexBuffer = gl.createBuffer();
+
+             texCoordBuffer = gl.createBuffer();
+             gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+             StartTexture();*/
+
+            //-------------
+            initBuffers();
+
+            addEventListener("keydown", moverect);
+
+            function moverect(e) {
+                switch (e.keyCode) { 
+                    case 38:
+
+                        translationShip[1] += 0.05;
+                        if (translationShip[1] > 1) translationShip[1] = 1;
+                        initBuffers();
+                        break;
+                    case 40:
+                        translationShip[1] -= 0.05;
+                        if (translationShip[1] < -1) translationShip[1] = -1;
+                        initBuffers();
+                        break;
+
+                }                
+            }
+
+
+            var timerSpawn = setInterval(function() {
+                //alert("тик");
+                var y = Math.random() * (1 + 1) - 1;
+                var transDist = Math.random() * (0.02 - 0.01) + 0.01;
+
+                var OneMeteo = new Meteo;
+
+                OneMeteo.y = y;
+                OneMeteo.trans = [0, 0];
+                OneMeteo.transDist = transDist;
+                OneMeteo.centre[0] = 0.9;
+                OneMeteo.centre[1] = y;
+                OneMeteo.life = 4;
+                OneMeteo.boom = false;
+
+                MeteoCoors.push(OneMeteo);
+
+                //MeteoCount++;
+                MeteoCoors.forEach(function(item, i, MeteoCoors) {
+                    if (item.centre[0] < -1.0) {
+                        MeteoCoors.splice(i, 1);
+                    }
+                })
+
+
+                //initBuffers();
+            }, Math.floor(Math.random() * (100 - 700 + 1) + 700));
+
+            var timerMove = setInterval(function() {
+                //alert("тик");
+                MeteoCoors.forEach(function(item, i, MeteoCoors) {
+                        item.trans[0] -= item.transDist;
+                    })
+                    //initBuffers();
+            }, 16);
+
+            var timerCheckBoom = setInterval(function() {
+                MeteoCoors.forEach(function(item, i, MeteoCoors) {
+                    //alert(Math.sqrt(Math.pow(item.centre[0] - ShipCentre[0], 2) + Math.pow(item.centre[1] - ShipCentre[1], 2)));
+                    if (Math.sqrt(Math.pow(item.centre[0] - ShipCentre[0], 2) + Math.pow(item.centre[1] - ShipCentre[1], 2)) <= 0.2 && boom == false) {
+                        //alert('Тыщ' + Math.sqrt(Math.pow(item.centre[0] - ShipCentre[0], 2) + Math.pow(item.centre[1] - ShipCentre[1], 2)));
+                        HP--;
+                        MeteoCoors.splice(i, 1);
+                        boom = true;
+                        var boomTimeout = setTimeout(function() {
+                            boom = false;
+                        }, 1000)
+                        document.getElementById('Lifes').innerHTML = HP;
+                        if (HP == 0) {
+                            //gl.clearColor(1.0, 0.0, 0.0, 0.5);
+                            gl.clear(gl.COLOR_BUFFER_BIT);
+                            document.getElementById("Gameover").style.visibility = "visible";
+                            document.getElementById("Restart").style.visibility = "visible";
+
+
+                            clearInterval(timerReDraw);
+                            clearInterval(timerBullet);
+                            clearInterval(timerMove);
+                            clearInterval(timerSpawn);
+                            clearInterval(timerReDraw);
+                            clearInterval(timerCheckBoom);
+                            removeEventListener("keydown", moverect);
+
+                            return;
+                        }
+                    }
+                })
+            }, 16);
+
+
+
+            var timerBullet = setInterval(function() {
+                //alert("тик");
+                //numberOfBullets++;  
+                var OneBullet = new Bullet;
+
+                OneBullet.transDist = 0;
+                OneBullet.coordCentre[0] = ShipCentre[0];
+                OneBullet.coordCentre[1] = ShipCentre[1];
+
+                BulletCoors.push(OneBullet);
+
+                BulletCoors.forEach(function(item1, i, BulletCoors) {
+                    item1.transDist += Math.random() * (0.2 - 0.05) + 0.05;
+                    if (item1.transDist > 2) BulletCoors.shift();
+                    //initBuffers();
+
+                    MeteoCoors.forEach(function(item2, j, MeteoCoors) {
+                        if (Math.sqrt(Math.pow(item1.coordCentre[0] - item2.centre[0], 2) + Math.pow(item1.coordCentre[1] - item2.centre[1], 2)) <= 0.115) {
+                            //alert('Разбил))');
+                            item2.life--;
+                            BulletCoors.splice(i, 1);
+                            if (item2.life == 0) {
+                                item2.boom = true;
+
+                                var boomTimeout = setTimeout(function() {
+                                        item2.boom = false;
+                                        MeteoCoors.splice(j, 1);
+                                    }, 50)
+                                    //initBuffers();
+                            }
+                        }
+                    })
+                })
+
+            }, 16);
+
+            var timerReDraw = setInterval(function() {
+                initBuffers();
+            }, 16);
+        }
+
+
+        function Restart() {
+            MeteoCoors.length = 0;
+            BulletCoors.length = 0;
+
+            ShipCentre = [-0.9, 0.0];
+
+            boom = false;
+            boomMeteo = false;
+
+            pifpaf = false;
+
+            HP = 5;
+            document.getElementById('Lifes').innerHTML = HP;
+            document.getElementById("Gameover").style.visibility = "hidden";
+            Start();
+        }
+    </script>
+</body>
+
+</html>

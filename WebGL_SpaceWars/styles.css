@@ -1,0 +1,46 @@
+body {
+    background: rgb(124, 118, 216);
+}
+
+.container {
+    position: relative;
+}
+
+#Field {
+    position: relative;
+}
+
+#Start {
+    position: absolute;
+    left: 150px;
+    top: 150px;
+}
+
+#Restart {
+    position: absolute;
+    visibility: hidden;
+    left: 150px;
+    top: 300px;
+}
+
+#canvas {
+    background-image: url(http://localhost:8888/WebGL/9.jpg);
+    background-size: cover;
+}
+
+#Gameover {
+    position: absolute;
+    left: 200px;
+    top: 240px;
+    visibility: hidden;
+    color: white;
+}
+
+input {
+    width: 200px;
+    height: 200px;
+    background-color: transparent;
+    color: white;
+    border: none;
+    font-size: 60px;
+}
