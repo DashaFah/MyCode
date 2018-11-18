@@ -1,0 +1,23 @@
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <script src="editor.js"></script>
+    <script src="jquery-1.8.3.min.js"></script>
+</head>
+
+<body>
+    <p id="num1text" style="margin: 0px"> Введите выражение</p>
+    <input type="text" id="line">
+    <script>
+        var input = document.getElementById('line')
+        input.oninput = function() {
+            ajaxRequest(this.value);
+        };
+    </script>
+
+    <span id="=">=</span>
+    <span id="result"></span>
+</body>
+
+</html>

@@ -1,0 +1,50 @@
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <script src="bearbeiter.js"></script>
+    <script src="jquery-1.8.3.min.js"></script>
+</head>
+
+<body>
+
+    <p id="num1text" style="margin: 0px"> Первое число</p>
+    <input type="number" id="num1">
+    <script>
+        var input = document.getElementById('num1')
+        input.oninput = function() {
+            ajaxRequest(this.value, oper.value, num2.value);
+        };
+    </script>
+
+    <p>
+        <select id="oper" name="operation" size="1" onChange="ZweiteNum(num1.value,this.value,num2.value)">
+        <option value="addition" selected>Сложение</option>
+        <option value="subtraktion">Вычитание</option>
+        <option value="multiplikation">Умножение</option>
+        <option value="division">Деление</option>
+        <option value="potenzierung">Возведение в степень</option>
+        <option value="wurzel">Извлечение корня</option>
+        <option value="sinus">Синус</option>
+        <option value="kosinus">Косинус</option>
+        <option value="tangens">Тангенс</option>
+        <option value="kotangens">Котангенс</option>
+        </select>
+    </p>
+
+    <p id="num2text" style="margin: 0px">Второе число</p>
+    <input type="number" id="num2" onchange="ajaxRequest(num1.value,oper.value,this.value)">
+    <script>
+        var input = document.getElementById('num2')
+        input.oninput = function() {
+            ajaxRequest(num1.value, oper.value, this.value);
+        };
+    </script>
+    <p id="=">=</p>
+    <p id="result"></p>
+
+
+
+</body>
+
+</html>
