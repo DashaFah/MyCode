@@ -1,0 +1,47 @@
+body {
+    font: 14pt Arial, sans-serif;
+    margin: 0;
+}
+
+a {
+    text-decoration: none;
+}
+
+h1{
+    padding: 7px;
+}
+
+p{
+    padding-left: 7px;
+}
+
+nav a {
+    color: #8b8ff7;
+}
+
+nav a:visited {
+    text-decoration: none;
+    color: #8b8ff7;
+}
+
+header {
+    background: linear-gradient(#8b8ff7, #8cc0f9);
+}
+
+
+nav{
+background: #EEDFAC;
+}
+
+nav ul{
+    margin-left: 5px;    
+    padding: 0;    
+}
+
+nav li{
+    display: inline-block;
+    padding: 7px 7px;
+}
+
+
+
